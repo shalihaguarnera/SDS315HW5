@@ -1,0 +1,201 @@
+---
+title: "**Homework 5**"
+author: "Shaliha Guarnera - SDS 315 - scg2595 - [GitHub Repository](https://github.com/shalihaguarnera/SDS315HW5.git)"
+date: "February 2024"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+letter_frequencies <- read.csv("letter_frequencies.csv")
+brown_sentences <- readLines("brown_sentences.txt")
+library(ggplot2)
+library(tidyverse)
+library(kableExtra)
+library(RColorBrewer)
+library(dplyr)
+library(rvest)
+library(sas7bdat)
+library(stringr)
+library(reshape2)
+library(htmltools)
+library(mosaic)
+
+```
+
+\newpage
+
+## **Problem 1: Iron Bank**
+
+Null hypothesis: Over the long run, securities trades from the Iron Bank are flagged at the same 2.4% baseline rate as that of other traders. \
+Test statistic: The 70 flagged trades out of the last 2021 trades from the Iron Bank trades will be the test statistic used to measure evidence against the null hypothesis. \
+Plot of the probability distribution:
+
+```{r}
+
+sim_trades = do(100000) * nflip(n = 2021, prob = 0.024)
+
+ggplot(sim_trades) + 
+  geom_histogram(aes(x = nflip), binwidth = 1, col = 'palevioletred3', fill = 'lightpink') +
+  labs(title = 'Probability Distribution of Flagged Trades at the 2.4% Baseline Rate', x = 'Amount of Flagged Trades', y = 'Count') +
+  theme_minimal()
+
+trade_pvalue <- sum(sim_trades >= 70)/100000
+
+```
+
+P-value: The p-value of the distribution was approximately `r round(trade_pvalue, 4)`. \
+Conclusion: Since the p-value is less than the significance level of 0.05, we reject the null hypothesis. There is  sufficient evidence to suggest that trades from the Iron Bank are getting flagged at a rate different than the baseline rate of 2.4%.
+
+\newpage
+
+## **Problem 2: Health Inspections**
+
+Null hypothesis: On average, Gourmet Bites restaurants are cited for health code violates at the same baseline rate of 3% as restaurants in the city are cited for health code violations. \
+Test statistic: The 8 reported health code violations of 50 Gourmet Bite inspections will be the test statistic used to measure evidence against the null hypothesis. \
+Plot of probability distribution:
+
+```{r}
+
+sim_restaurant = do(100000) * nflip(n = 50, prob = 0.03)
+
+ggplot(sim_restaurant) + 
+  geom_histogram(aes(x = nflip), binwidth = 1, col = 'palevioletred3', fill = 'lightpink') +
+  labs(title = 'Probability Distribution of Health Code Violations at the 3% Baseline Rate', x = 'Amount of Health
+       Code Violations', y = 'Count') +
+  theme_minimal()
+
+restaurant_pvalue <- sum(sim_restaurant >= 8)/100000
+
+```
+
+P-value: The p-value of the distribution was approximately `r round(restaurant_pvalue, 4)`. \
+Conclusion: Since the p-value is less than the significance level of 0.05, we reject the null hypothesis. There is  sufficient evidence to suggest that Gourmet Bites restaurants are getting cited for health code violations at a different rate than the baseline rate of 3%. 
+
+\newpage
+
+## **Problem 3: LLM Watermarking**
+
+### **Part A: The Null or Reference Distribution**
+
+The null distribution we will be using as reference is as follows.
+
+```{r}
+
+calculate_chi_squared = function(sentence, freq_table) {
+  
+  # Ensure letter frequencies are normalized and sum to 1
+  freq_table$Probability = freq_table$Probability / sum(freq_table$Probability)
+  
+  # Remove non-letters and convert to uppercase
+  clean_sentence = gsub("[^A-Za-z]", "", sentence)
+  clean_sentence = toupper(clean_sentence)
+  
+  # Count the occurrences of each letter in the sentence
+  observed_counts = table(factor(strsplit(clean_sentence, "")[[1]], levels = freq_table$Letter))
+  
+  # Calculate expected counts
+  total_letters = sum(observed_counts)
+  expected_counts = total_letters * freq_table$Probability
+  
+  # Chi-squared statistic
+  chi_squared_stat = sum((observed_counts - expected_counts)^2 / expected_counts)
+  
+  return(chi_squared_stat)
+}
+
+brown_chi_square <- c()
+for (sentence in brown_sentences){
+  x_chi_square <- calculate_chi_squared(sentence, letter_frequencies)
+  brown_chi_square <- c(brown_chi_square, x_chi_square)
+}
+
+brown_chi_square <- data.frame(brown_chi_square)
+ggplot(brown_chi_square) +
+  geom_histogram(aes(x=brown_chi_square), col = 'palevioletred3', fill = 'lightpink', bin = 10) +
+  labs(title = 'Null Distribution of Chi-Squared Values in Normal English Sentences', x = 'Chi-Squared Values', 
+       y = 'Count') +
+  theme_minimal()
+
+```
+
+This was compiled by using a sample text, 'brown_sentences", that we are assuming as "normal English sentences" in this scenario. The sentences were first cleaned and processed, where non-letter characters were removed, characters were converted into uppercase, and the occurrences of each letter were counted. The frequency of each letter in each given sentence were then compared to the expected letter frequency, which was calculated using the letter frequency distribution in the 'letter_frequencies' dataset, based on the sentence length. The chi-squared statistic was then computed for each sentence. 
+
+### **Part B: Checking For a Watermark**
+
+```{r}
+
+# Putting the ten sentences investigated into a character 
+ten_sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+
+# Calculating the chi squared for each of the ten sentences
+ten_sentence_chi_squared <- c()
+for (sentence in ten_sentences){
+  sentence_chi_squared <- calculate_chi_squared(sentence, letter_frequencies)
+  ten_sentence_chi_squared <- c(ten_sentence_chi_squared, sentence_chi_squared)
+}
+
+# Calculating the p-value for each of the chi-squared of the ten sentences
+ten_sentence_pvalues <- c()
+for (chi in ten_sentence_chi_squared){
+  sentence_pvalues <- sum(brown_chi_square >= chi)/56745
+  sentence_pvalues <- round(sentence_pvalues, 3)
+  ten_sentence_pvalues <- c(ten_sentence_pvalues, sentence_pvalues)
+}
+
+# Creating a plot of the chi-squared values
+ten_sentence_chi_squared <- data.frame(ten_sentence_chi_squared)
+sentence_count <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+sentence_count <- factor(sentence_count, levels = as.character(1:10))
+ten_sentence_chi_squared <- cbind(sentence_count, ten_sentence_chi_squared)
+
+ggplot(ten_sentence_chi_squared) +
+  geom_point(aes(x = sentence_count, y = ten_sentence_chi_squared), col = 'lightpink', size = 2.5) +
+  scale_x_discrete(labels = as.character(1:10)) +
+  labs(title = 'Distribution of Chi-Squared Values For Each of the Ten Sentences', x = 'Sentence', y = 'Chi-Squared
+       Value') +
+  theme_minimal()
+
+# Creating a table of the p-values
+ten_sentence_pvalues_table <- data.frame(ten_sentence_pvalues)
+sentence_count <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+ten_sentence_pvalues_table <- cbind(sentence_count, ten_sentence_pvalues)
+ten_sentence_pvalues_table %>%
+  kbl(booktabs = TRUE, col.names = c("Sentence", "P-Value")) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+```
+
+Out of the 10 sentences investigated, sentence 6 was the sentence watermarked by an LLM. \
+For each of the sentences, a chi-squared value was computed to compare the observed frequency for each letter in the given sentence to the letter frequencies in the 'letter_frequency' dataset. A plot of the chi-squared values for each of the ten sentences are shown above. Then, each sentences' chi-squared value was used as a test statistic to compute a p-value using the null distribution in the previous part of the problem.  This was done by finding the proportion of chi-squared values in the null distribution that were as extreme or more extreme as the chi-squared value of the tested sentence. The p-values for each of the ten sentences are displayed in the table above. Sentence 6 was the sentence with the greatest chi-square compared to the other sentences and had the smallest p-value. \
+Sentence 6's large chi-squared is due to the LLM watermarking, as it uses a different letter frequency than "normal" English, making its chi-squared larger from this difference. Sentence 6's p-value reveals its LLM watermark as it is the least compared to the other p-values, showing how extreme sentence 6's chi-squared is compared to the other chi-squares.
+
+
+
+
+
+
+
+
+
+
+
